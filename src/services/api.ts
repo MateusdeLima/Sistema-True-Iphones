@@ -10,50 +10,13 @@ type ServicoUpdate = Tables['servicos']['Update'];
 type PecaInsert = Tables['pecas']['Insert'];
 type PecaUpdate = Tables['pecas']['Update'];
 
-// Gerador de IDs únicos simples
-const gerarId = () => Math.random().toString(36).substring(2, 15);
-
-// Armazenamento local para modo offline/desenvolvimento
-const storage = {
-  clientes: [
-    { id: '1', nome: 'João Silva', telefone: '11999887766', email: 'joao@example.com', created_at: new Date().toISOString() },
-    { id: '2', nome: 'Maria Oliveira', telefone: '11988776655', email: 'maria@example.com', created_at: new Date().toISOString() }
-  ] as Cliente[],
-  servicos: [
-    { 
-      id: '1', 
-      cliente_id: '1', 
-      dispositivo: 'iPhone', 
-      modelo: 'XR', 
-      problema: 'Tela quebrada', 
-      status: 'pendente' as const, 
-      valor: 350, 
-      data_entrada: new Date().toISOString(), 
-      created_at: new Date().toISOString() 
-    },
-    { 
-      id: '2', 
-      cliente_id: '2', 
-      dispositivo: 'iPhone', 
-      modelo: '11', 
-      problema: 'Bateria fraca', 
-      status: 'em_andamento' as const, 
-      valor: 200, 
-      data_entrada: new Date().toISOString(), 
-      created_at: new Date().toISOString() 
-    }
-  ] as Servico[],
-  pecas: [
-    { id: '1', nome: 'Tela iPhone XR', quantidade: 5, preco_custo: 180, preco_venda: 300, created_at: new Date().toISOString() },
-    { id: '2', nome: 'Bateria iPhone 11', quantidade: 8, preco_custo: 100, preco_venda: 180, created_at: new Date().toISOString() }
-  ] as Peca[]
-};
-
-// Funções auxiliares para dados mockados
-const usarDadosMockados = (error: Error | unknown, operacao: string) => {
-  console.warn(`Erro na operação ${operacao}:`, error);
-  console.info('Usando dados mockados como fallback');
-  return true; // Em produção, seria bom ter uma lógica mais sofisticada aqui
+// Função de tratamento de erro genérica
+const handleDatabaseError = (error: Error | unknown, operacao: string) => {
+  console.error(`Erro durante ${operacao}:`, error);
+  if (error instanceof Error) {
+    throw new Error(`Falha ao ${operacao}: ${error.message}`);
+  }
+  throw new Error(`Falha ao ${operacao}: Erro desconhecido`);
 };
 
 export const clientesApi = {
@@ -63,14 +26,12 @@ export const clientesApi = {
         .from('clientes')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
-      return data;
+      return data || [];
     } catch (error) {
-      if (usarDadosMockados(error, 'listar clientes')) {
-        return storage.clientes;
-      }
-      throw error;
+      handleDatabaseError(error, 'listar clientes');
+      return [];
     }
   },
 
@@ -78,22 +39,15 @@ export const clientesApi = {
     try {
       const { data, error } = await supabase
         .from('clientes')
-        .insert(cliente)
+        .insert([cliente])
         .select()
         .single();
-      
+
       if (error) throw error;
+      if (!data) throw new Error('Nenhum dado retornado após criar cliente');
       return data;
     } catch (error) {
-      if (usarDadosMockados(error, 'criar cliente')) {
-        const novoCliente: Cliente = {
-          id: gerarId(),
-          created_at: new Date().toISOString(),
-          ...cliente
-        };
-        storage.clientes.unshift(novoCliente);
-        return novoCliente;
-      }
+      handleDatabaseError(error, 'criar cliente');
       throw error;
     }
   },
@@ -106,21 +60,12 @@ export const clientesApi = {
         .eq('id', id)
         .select()
         .single();
-      
+
       if (error) throw error;
+      if (!data) throw new Error('Cliente não encontrado');
       return data;
     } catch (error) {
-      if (usarDadosMockados(error, 'atualizar cliente')) {
-        const index = storage.clientes.findIndex(c => c.id === id);
-        if (index === -1) throw new Error('Cliente não encontrado');
-        
-        const clienteAtualizado = {
-          ...storage.clientes[index],
-          ...cliente
-        };
-        storage.clientes[index] = clienteAtualizado;
-        return clienteAtualizado;
-      }
+      handleDatabaseError(error, 'atualizar cliente');
       throw error;
     }
   },
@@ -131,16 +76,10 @@ export const clientesApi = {
         .from('clientes')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
     } catch (error) {
-      if (usarDadosMockados(error, 'deletar cliente')) {
-        const index = storage.clientes.findIndex(c => c.id === id);
-        if (index !== -1) {
-          storage.clientes.splice(index, 1);
-        }
-        return;
-      }
+      handleDatabaseError(error, 'deletar cliente');
       throw error;
     }
   }
@@ -153,14 +92,12 @@ export const servicosApi = {
         .from('servicos')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
-      return data;
+      return data || [];
     } catch (error) {
-      if (usarDadosMockados(error, 'listar serviços')) {
-        return storage.servicos;
-      }
-      throw error;
+      handleDatabaseError(error, 'listar serviços');
+      return [];
     }
   },
 
@@ -168,22 +105,15 @@ export const servicosApi = {
     try {
       const { data, error } = await supabase
         .from('servicos')
-        .insert(servico)
+        .insert([servico])
         .select()
         .single();
-      
+
       if (error) throw error;
+      if (!data) throw new Error('Nenhum dado retornado após criar serviço');
       return data;
     } catch (error) {
-      if (usarDadosMockados(error, 'criar serviço')) {
-        const novoServico: Servico = {
-          id: gerarId(),
-          created_at: new Date().toISOString(),
-          ...servico
-        };
-        storage.servicos.unshift(novoServico);
-        return novoServico;
-      }
+      handleDatabaseError(error, 'criar serviço');
       throw error;
     }
   },
@@ -196,21 +126,12 @@ export const servicosApi = {
         .eq('id', id)
         .select()
         .single();
-      
+
       if (error) throw error;
+      if (!data) throw new Error('Serviço não encontrado');
       return data;
     } catch (error) {
-      if (usarDadosMockados(error, 'atualizar serviço')) {
-        const index = storage.servicos.findIndex(s => s.id === id);
-        if (index === -1) throw new Error('Serviço não encontrado');
-        
-        const servicoAtualizado = {
-          ...storage.servicos[index],
-          ...servico
-        };
-        storage.servicos[index] = servicoAtualizado;
-        return servicoAtualizado;
-      }
+      handleDatabaseError(error, 'atualizar serviço');
       throw error;
     }
   },
@@ -221,16 +142,10 @@ export const servicosApi = {
         .from('servicos')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
     } catch (error) {
-      if (usarDadosMockados(error, 'deletar serviço')) {
-        const index = storage.servicos.findIndex(s => s.id === id);
-        if (index !== -1) {
-          storage.servicos.splice(index, 1);
-        }
-        return;
-      }
+      handleDatabaseError(error, 'deletar serviço');
       throw error;
     }
   }
@@ -243,14 +158,12 @@ export const pecasApi = {
         .from('pecas')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
-      return data;
+      return data || [];
     } catch (error) {
-      if (usarDadosMockados(error, 'listar peças')) {
-        return storage.pecas;
-      }
-      throw error;
+      handleDatabaseError(error, 'listar peças');
+      return [];
     }
   },
 
@@ -258,22 +171,15 @@ export const pecasApi = {
     try {
       const { data, error } = await supabase
         .from('pecas')
-        .insert(peca)
+        .insert([peca])
         .select()
         .single();
-      
+
       if (error) throw error;
+      if (!data) throw new Error('Nenhum dado retornado após criar peça');
       return data;
     } catch (error) {
-      if (usarDadosMockados(error, 'criar peça')) {
-        const novaPeca: Peca = {
-          id: gerarId(),
-          created_at: new Date().toISOString(),
-          ...peca
-        };
-        storage.pecas.unshift(novaPeca);
-        return novaPeca;
-      }
+      handleDatabaseError(error, 'criar peça');
       throw error;
     }
   },
@@ -286,21 +192,12 @@ export const pecasApi = {
         .eq('id', id)
         .select()
         .single();
-      
+
       if (error) throw error;
+      if (!data) throw new Error('Peça não encontrada');
       return data;
     } catch (error) {
-      if (usarDadosMockados(error, 'atualizar peça')) {
-        const index = storage.pecas.findIndex(p => p.id === id);
-        if (index === -1) throw new Error('Peça não encontrada');
-        
-        const pecaAtualizada = {
-          ...storage.pecas[index],
-          ...peca
-        };
-        storage.pecas[index] = pecaAtualizada;
-        return pecaAtualizada;
-      }
+      handleDatabaseError(error, 'atualizar peça');
       throw error;
     }
   },
@@ -311,16 +208,10 @@ export const pecasApi = {
         .from('pecas')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
     } catch (error) {
-      if (usarDadosMockados(error, 'deletar peça')) {
-        const index = storage.pecas.findIndex(p => p.id === id);
-        if (index !== -1) {
-          storage.pecas.splice(index, 1);
-        }
-        return;
-      }
+      handleDatabaseError(error, 'deletar peça');
       throw error;
     }
   }
